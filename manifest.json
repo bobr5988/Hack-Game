@@ -1,0 +1,16 @@
+{
+  "name": "RBMK ULTIMATE INFILTRATOR",
+  "short_name": "RBMK Hack",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#010501",
+  "theme_color": "#010501",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

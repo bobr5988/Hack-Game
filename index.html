@@ -3,21 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
-    <title>Hack Game</title>
-
-    <link rel="manifest" href="manifest.json">
-
     <meta name="theme-color" content="#010501">
-
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="RBMK Hack">
-    
-    <link rel="apple-touch-icon" href="icon.png">
-    
+    <title>RBMK ULTIMATE INFILTRATOR</title>
+    <link rel="manifest" href="manifest.json">
     <style>
-        /* Весь ваш CSS остается без изменений */
         :root {
             --green: #00ff41;
             --dark: #001a00;
@@ -98,7 +89,7 @@
             border-top: 2px solid var(--dark); flex-shrink: 0;
         }
 
-        .input-preview { font-size: 14px; margin-bottom: 10px; border-left: 3px solid var(--green); padding-left: 10px; height: 20px;    	 display: flex; align-items: center;}
+        .input-preview { font-size: 14px; margin-bottom: 10px; border-left: 3px solid var(--green); padding-left: 10px; height: 20px; display: flex; align-items: center;}
         .keys-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .key {
             background: #0a110a; border: 1px solid var(--dark);
@@ -118,7 +109,8 @@
     </style>
 </head>
 <body>
-<header>
+
+    <header>
         <div class="stat-line">
             <span>MOD: RBMK_ROGUE_V5</span>
             <span>PUMPS: <span id="p-count">0/6</span></span>
@@ -165,7 +157,9 @@
     </div>
 
     <script>
-        const audio = new (window.AudioContext || window.webkitAudioContext)();
+        let audio;
+        function initAudio() { if(!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); }
+
         let buf = "";
         let risk = 0;
         let pActive = null;
@@ -180,11 +174,11 @@
             { q: "SCRAM_CMD?", a: "AZ-5", o: ["AZ-5", "EPS-1", "STOP"] },
             { q: "PRESSURE?", a: "7_MPA", o: ["7_MPA", "15_MPA", "1_MPA"] },
             { q: "TEMP_LIMIT?", a: "700C", o: ["700C", "300C", "1500C"] },
-            { q: "COOLANT?", a: "H2O", o: ["H2O", "CO2", "HELIUM"] },
-            { q: "CORE_HEIGHT?", a: "7_METERS", o: ["7_METERS", "2_METERS", "20_METERS"] }
+            { q: "COOLANT?", a: "H2O", o: ["H2O", "CO2", "HELIUM"] }
         ];
 
         function play(f, d, t='square', g=0.02) {
+            if(!audio) return;
             try {
                 const o = audio.createOscillator();
                 const v = audio.createGain();
@@ -197,7 +191,7 @@
         }
 
         async function log(text, type='') {
-	    const div = document.createElement('div');
+            const div = document.createElement('div');
             div.className = 'line ' + type;
             const term = document.getElementById('terminal');
             term.appendChild(div);
@@ -210,10 +204,11 @@
             term.scrollTop = term.scrollHeight;
         }
 
-        function k(v) { buf += v; document.getElementById('buffer').innerText = buf; play(600, 0.05); }
-        function c(v) { buf = v; document.getElementById('buffer').innerText = buf; play(800, 0.05); }
+        function k(v) { initAudio(); buf += v; document.getElementById('buffer').innerText = buf; play(600, 0.05); }
+        function c(v) { initAudio(); buf = v; document.getElementById('buffer').innerText = buf; play(800, 0.05); }
 
         async function run() {
+            initAudio();
             if (state === "BOOM") return;
             const cmd = buf.trim().toUpperCase();
             buf = ""; document.getElementById('buffer').innerText = "";
@@ -223,26 +218,20 @@
                 if (cmd === "SCAN") {
                     if (!pActive) pActive = Array.from({length: 6}, () => Math.floor(100 + Math.random() * 899));
                     await log("SCANNING_LOCAL_SEGMENT");
-                    await new Promise(r => setTimeout(r, 500));
                     for (let id of pActive) {
                         const dead = pDead.includes(id);
-                        await log(NODE_${id}:_${dead ? "OFFLINE" : "READY"}, dead ? "dead" : "ok");
+                        await log(`NODE_${id}:_${dead ? "OFFLINE" : "READY"}`, dead ? "dead" : "ok");
                     }
                 } 
-                else if (cmd.startsWith("HACK") || (pActive && pActive.includes(parseInt(cmd)))) {
+                else if (cmd.startsWith("HACK")) {
                     let val = parseInt(cmd.replace("HACK", "").trim());
-                    if (isNaN(val)) val = parseInt(cmd);
-                    
                     if (pActive && pActive.includes(val)) {
                         if (pDead.includes(val)) await log("ALREADY_COMPROMISED", "err");
                         else { targetId = val; startQuiz(); }
-                    } else await log("NODE_NOT_RECOGNIZED", "err");
+                    } else await log("NODE_NOT_FOUND", "err");
                 }
-                else if (cmd === "") document.getElementById('terminal').innerHTML = "";
             } 
-            else if (state === "QUIZ") {
-                checkQuiz(cmd);
-            }
+            else if (state === "QUIZ") { checkQuiz(cmd); }
         }
 
         function startQuiz() {
@@ -252,20 +241,20 @@
             currentQuiz = {
                 q: item.q,
                 a: (shuffled.indexOf(item.a) + 1).toString(),
-                options: shuffled.map((o, i) => ${i+1}.${o}).join(" | ")
+                options: shuffled.map((o, i) => `${i+1}.${o}`).join(" | ")
             };
-            log("SECURITY_CHALLENGE_REQUIRED", "sys");
+            log("SECURITY_CHALLENGE", "sys");
             log(currentQuiz.q);
             log(currentQuiz.options);
         }
 
         async function checkQuiz(ans) {
             if (ans === currentQuiz.a) {
-                await log("VERIFICATION_COMPLETE", "ok");
+                await log("ACCESS_GRANTED", "ok");
                 setTimeout(initFirewall, 600);
             } else {
-                await log("VERIFICATION_FAILED_ALERT_SENT", "err");
-                risk += 15;
+                await log("ACCESS_DENIED", "err");
+                risk += 20;
                 document.getElementById('risk-val').innerText = risk;
                 state = "IDLE";
                 if(risk >= 100) explodeTerminal();
@@ -279,20 +268,19 @@
         function initFirewall() {
             state = "FIREWALL";
             document.getElementById('hack-overlay').style.display = 'flex';
-            document.getElementById('snake-ctrl').style.display = 'none';
             document.getElementById('fw-hint').style.display = 'block';
+            document.getElementById('snake-ctrl').style.display = 'none';
             canv.width = 280; canv.height = 280;
             fwTarget = Math.random() * Math.PI * 1.5 + 0.5;
             fwLoop = requestAnimationFrame(drawFirewall);
-	    canv.onclick = () => {
+            canv.onclick = () => {
                 let diff = Math.abs(fwAngle % (Math.PI*2) - fwTarget);
                 if (diff < 0.5 || diff > 5.7) {
                     cancelAnimationFrame(fwLoop);
-                    play(1500, 0.2, 'sine');
                     initSnake();
                 } else {
                     cancelAnimationFrame(fwLoop);
-                    failHack("SYNC_INTERRUPTED");
+                    failHack("FIREWALL_BLOCK");
                 }
             };
         }
@@ -301,111 +289,85 @@
             gctx.clearRect(0,0,280,280);
             gctx.strokeStyle = "#001a00"; gctx.lineWidth = 15;
             gctx.beginPath(); gctx.arc(140, 140, 90, 0, Math.PI*2); gctx.stroke();
-            gctx.strokeStyle = "#00ff41";
+            gctx.strokeStyle = varProp('--green');
             gctx.beginPath(); gctx.arc(140, 140, 90, fwTarget-0.4, fwTarget+0.4); gctx.stroke();
-            fwAngle += 0.04;
-            gctx.strokeStyle = "#fff"; gctx.lineWidth = 20;
+            fwAngle += 0.05;
+            gctx.strokeStyle = "#fff";
             gctx.beginPath(); gctx.arc(140, 140, 90, fwAngle-0.1, fwAngle+0.1); gctx.stroke();
             if (state === "FIREWALL") fwLoop = requestAnimationFrame(drawFirewall);
         }
+
+        function varProp(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
         let snake, food, dir, sLoop;
         function initSnake() {
             state = "SNAKE";
             document.getElementById('snake-ctrl').style.display = 'grid';
             document.getElementById('fw-hint').style.display = 'none';
-            canv.onclick = null;
             snake = [{x:10, y:10}]; food = {x:5, y:5}; dir = {x:1, y:0};
-            sLoop = setInterval(drawSnake, 160);
+            if(sLoop) clearInterval(sLoop);
+            sLoop = setInterval(drawSnake, 150);
         }
 
         function drawSnake() {
             const h = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
-            if (h.x<0  h.x>=20  h.y<0  h.y>=20  snake.some(s=>s.x===h.x && s.y===h.y)) {
-                clearInterval(sLoop); failHack("DATA_STREAM_LOST"); return;
+            if (h.x<0 || h.x>=20 || h.y<0 || h.y>=20 || snake.some(s=>s.x===h.x && s.y===h.y)) {
+                clearInterval(sLoop); failHack("CRITICAL_ERROR"); return;
             }
             snake.unshift(h);
             if(h.x===food.x && h.y===food.y) {
-                play(2000, 0.04, 'sine');
                 if(snake.length >= 5) { clearInterval(sLoop); winHack(); return; }
                 food = {x:Math.floor(Math.random()*18)+1, y:Math.floor(Math.random()*18)+1};
             } else snake.pop();
             gctx.fillStyle = "#000"; gctx.fillRect(0,0,280,280);
-            gctx.fillStyle = "#00ff41";
+            gctx.fillStyle = varProp('--green');
             snake.forEach(s=>gctx.fillRect(s.x*14, s.y*14, 13, 13));
-            gctx.fillStyle = "#ffb000"; gctx.fillRect(food.x*14, food.y*14, 13, 13);
+            gctx.fillStyle = varProp('--warn');
+            gctx.fillRect(food.x*14, food.y*14, 13, 13);
         }
 
         function failHack(m) {
             document.getElementById('hack-overlay').style.display = 'none';
             state = "IDLE";
-            log(m || "HACK_FAILED", "err");
+            log(m, "err");
         }
 
         async function winHack() {
             document.getElementById('hack-overlay').style.display = 'none';
             pDead.push(targetId);
             state = "IDLE";
-            document.getElementById('p-count').innerText = ${pDead.length}/6;
+            document.getElementById('p-count').innerText = `${pDead.length}/6`;
             document.getElementById('global-bar').style.width = (pDead.length/6)*100 + "%";
-            await log("NODE_DEACTIVATED_SUCCESSFULLY", "ok");
+            await log("NODE_FLUSHED", "ok");
             if (pDead.length === 6) runFinalSequence();
         }
 
         async function runFinalSequence() {
             state = "BOOM";
-            document.getElementById('mode-status').innerText = "CRITICAL";
+            document.getElementById('mode-status').innerText = "MELTDOWN";
             document.getElementById('mode-status').style.color = "red";
-            await log("ALL_NODES_OFFLINE_MELTDOWN_INIT", "err");
-            await new Promise(r => setTimeout(r, 1000));
-            
-            const term = document.getElementById('terminal');
-            term.innerHTML = "";
-            
-            let counter = 0;
-            const finalInterval = setInterval(() => {
-                term.innerHTML = <div class='line err'>!!! EMERGENCY_OVERHEAT !!!</div>;
-                const lid = [
-                    "    .-------.    ",
-                    "  /  # # # #  \\  ",
-                    " |  # # # # #  | ",
-		    " |  # # # # #  | ",
-                    "  \\  # # # #  /  ",
-                    "    '-------'    "
-                ];
-                lid.forEach(l => {
-                    const line = document.createElement('div');
-                    line.className = 'line shaking';
-                    line.style.marginLeft = Math.random()*20 + "px";
-                    line.innerText = l.split('').map(c => Math.random() > 0.7 ? '@' : c).join('');
-                    term.appendChild(line);
-                });
-                play(200 + Math.random()*2000, 0.05, 'sawtooth', 0.02);
-                counter++;
-                if (counter > 40) {
-                    clearInterval(finalInterval);
-                    document.body.style.background = "white";
-                    document.body.innerHTML = "";
-                    play(40, 3, 'sawtooth', 0.5);
-                    setTimeout(() => location.reload(), 4000);
-                }
-            }, 80);
+            await log("CORE_CRITICAL", "err");
+            setInterval(() => {
+                const l = document.createElement('div');
+                l.className = 'line shaking err';
+                l.innerText = "RADIATION_LEAK_DETECTION_" + Math.random();
+                document.getElementById('terminal').appendChild(l);
+                play(100 + Math.random()*1000, 0.1, 'sawtooth');
+            }, 100);
         }
 
         function explodeTerminal() {
-            document.body.innerHTML = "<div style='color:red; text-align:center; padding-top:100px'>CONNECTION_CLOSED_BY_SECURITY</div>";
-            play(50, 2, 'sawtooth', 0.2);
+            document.body.innerHTML = "<div style='color:red;padding:50px'>SYS_HALTED: RISK_TOO_HIGH</div>";
             setTimeout(() => location.reload(), 3000);
         }
 
+        const handleTouch = (d) => (e) => { e.preventDefault(); if(state==="SNAKE") dir=d; };
         document.getElementById('btn-up').ontouchstart = (e) => { e.preventDefault(); if(dir.y===0) dir={x:0, y:-1}; };
         document.getElementById('btn-down').ontouchstart = (e) => { e.preventDefault(); if(dir.y===0) dir={x:0, y:1}; };
         document.getElementById('btn-left').ontouchstart = (e) => { e.preventDefault(); if(dir.x===0) dir={x:-1, y:0}; };
         document.getElementById('btn-right').ontouchstart = (e) => { e.preventDefault(); if(dir.x===0) dir={x:1, y:0}; };
 
-        log("SYSTEM_V5_STABLE");
-        log("SCAN_NETWORK_TO_START");
+        log("SYSTEM_READY");
     </script>
 </body>
-
 </html>
